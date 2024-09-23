@@ -1,28 +1,44 @@
-import { IsUUID, IsInt, IsDate, IsNotEmpty, IsNumber } from "class-validator";
+import {
+  IsUUID,
+  IsDate,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsPositive,
+} from "class-validator";
 import { Type } from "class-transformer";
 
 export class TransactionDto {
   @IsUUID()
   @IsNotEmpty()
-  id: string;
+  transactionExternalId: string;
 
-  @IsUUID()
   @IsNotEmpty()
-  accountExternalIdDebit: string;
+  @Type(() => TransactionType)
+  transactionType: TransactionType;
 
-  @IsUUID()
   @IsNotEmpty()
-  accountExternalIdCredit: string;
-
-  @IsInt()
-  @IsNotEmpty()
-  transferTypeId: number;
+  @Type(() => TransactionStatus)
+  transactionStatus: TransactionStatus;
 
   @IsNumber()
+  @IsPositive()
   @IsNotEmpty()
   value: number;
 
   @IsDate()
   @Type(() => Date)
   createdAt: Date;
+}
+
+export class TransactionType {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+}
+
+export class TransactionStatus {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 }

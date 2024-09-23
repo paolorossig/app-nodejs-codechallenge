@@ -14,17 +14,22 @@ export class AntiFraudService {
   ) {}
 
   validateTransaction(transaction: TransactionDto) {
+    const { transactionExternalId, value } = transaction;
     try {
-      if (transaction.value > MAX_TRANSACTION_VALUE) {
-        this.kafkaPort.emit(KafkaTopics.TRANSACTION_REJECTED, { transaction });
-        this.logger.log(`Transaction ${transaction.id} rejected`);
+      if (value > MAX_TRANSACTION_VALUE) {
+        this.kafkaPort.emit(KafkaTopics.TRANSACTION_REJECTED, {
+          transactionId: transactionExternalId,
+        });
+        this.logger.log(`Transaction ${transactionExternalId} rejected`);
       } else {
-        this.kafkaPort.emit(KafkaTopics.TRANSACTION_APPROVED, { transaction });
-        this.logger.log(`Transaction ${transaction.id} approved`);
+        this.kafkaPort.emit(KafkaTopics.TRANSACTION_APPROVED, {
+          transactionId: transactionExternalId,
+        });
+        this.logger.log(`Transaction ${transactionExternalId} approved`);
       }
     } catch (error) {
       this.logger.error(
-        `Error validating the transaction ${transaction.id}`,
+        `Error validating the transaction ${transactionExternalId}`,
         error
       );
     }

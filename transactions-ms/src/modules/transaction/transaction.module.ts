@@ -1,8 +1,9 @@
 import { Module } from "@nestjs/common";
-import { TransactionService } from "./transaction.service";
-import { TransactionController } from "./transaction.controller";
-import { PrismaService } from "src/prisma.service";
 import { ClientsModule, Transport } from "@nestjs/microservices";
+import { TransactionController } from "./transaction.controller";
+import { TransactionResolver } from "./transaction.resolver";
+import { TransactionService } from "./transaction.service";
+import { PrismaService } from "../../prisma.service";
 
 @Module({
   imports: [
@@ -20,6 +21,6 @@ import { ClientsModule, Transport } from "@nestjs/microservices";
     ]),
   ],
   controllers: [TransactionController],
-  providers: [TransactionService, PrismaService],
+  providers: [TransactionService, PrismaService, TransactionResolver],
 })
 export class TransactionModule {}

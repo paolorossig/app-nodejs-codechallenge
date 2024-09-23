@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -10,6 +9,7 @@ import { PrismaService } from "src/prisma.service";
 import { Prisma, Status } from "@prisma/client";
 import { ClientKafka } from "@nestjs/microservices";
 import { KafkaTopics } from "./enum/kafka.enum";
+import { mapTransaction } from "./mapper/transaction.mapper";
 
 @Injectable()
 export class TransactionService {
@@ -20,58 +20,85 @@ export class TransactionService {
     @Inject("KAFKA_TRANSACTION_SERVICE") private readonly kafkaPort: ClientKafka
   ) {}
 
+  private async retry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        // Rethrow if last attempt
+        if (attempt === retries - 1) {
+          this.logger.error("Max retries reached");
+          throw error;
+        }
+
+        // Handle specific errors to avoid retrying
+        if (error instanceof NotFoundException) {
+          throw error;
+        }
+
+        // Exponential wait time
+        const waitTime = 100 * Math.pow(2, attempt);
+        this.logger.warn(
+          `Attempt ${attempt + 1} failed, retrying in ...${waitTime}ms`
+        );
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
   async createTransaction(
     @Body() createTransactionInput: Prisma.TransactionCreateInput
   ) {
-    try {
+    this.logger.debug("Creating transaction...");
+    return this.retry(async () => {
       const createdTransaction = await this.prisma.transaction.create({
         data: createTransactionInput,
       });
 
-      const transaction = {
-        id: createdTransaction.id,
-        accountExternalIdDebit: createdTransaction.accountExternalIdDebit,
-        accountExternalIdCredit: createdTransaction.accountExternalIdCredit,
-        transferTypeId: createdTransaction.transferTypeId,
-        value: createdTransaction.value,
-        createdAt: createdTransaction.createdAt,
-      };
+      const transaction = mapTransaction(createdTransaction);
 
       this.kafkaPort.emit(KafkaTopics.TRANSACTION_CREATED, { transaction });
+      this.logger.debug("Message sent to kafka successfully");
 
-      this.logger.log("Message sent to kafka successfully");
-
-      return createdTransaction;
-    } catch (error) {
-      throw new ConflictException(`Error creating the transaction - ${error}`);
-    }
+      return transaction;
+    });
   }
 
-  async getTransactionById(id: string) {
-    const transaction = await this.prisma.transaction.findFirst({
-      where: { id },
+  async getTransactionById(transactionId: string) {
+    this.logger.debug(`Getting transaction with id ${transactionId}`);
+    return this.retry(async () => {
+      const transaction = await this.prisma.transaction.findFirst({
+        where: { id: transactionId },
+      });
+      if (!transaction) {
+        this.logger.debug(`Transaction ${transactionId} not found`);
+        throw new NotFoundException("Transaction not found");
+      }
+      this.logger.debug(`Transaction ${transactionId} found`);
+
+      return mapTransaction(transaction);
     });
-
-    if (!transaction) throw new NotFoundException("Transaction not found");
-
-    return transaction;
   }
 
-  async processApprovedTransaction(id: string) {
-    await this.prisma.transaction.update({
-      where: { id },
-      data: { status: Status.approved },
+  async processApprovedTransaction(transactionId: string) {
+    this.logger.debug(`Processing transaction ${transactionId}`);
+    return this.retry(async () => {
+      await this.prisma.transaction.update({
+        where: { id: transactionId },
+        data: { status: Status.approved },
+      });
+      this.logger.debug(`Transaction ${transactionId} approved`);
     });
-
-    this.logger.log(`Trasaction with ID ${id} was approved`);
   }
 
-  async processRejectedTransaction(id: string) {
-    await this.prisma.transaction.update({
-      where: { id },
-      data: { status: Status.rejected },
+  async processRejectedTransaction(transactionId: string) {
+    this.logger.debug(`Processing transaction ${transactionId}`);
+    return this.retry(async () => {
+      await this.prisma.transaction.update({
+        where: { id: transactionId },
+        data: { status: Status.rejected },
+      });
+      this.logger.debug(`Transaction ${transactionId} rejected`);
     });
-
-    this.logger.log(`Trasaction with ID ${id} was rejected`);
   }
 }

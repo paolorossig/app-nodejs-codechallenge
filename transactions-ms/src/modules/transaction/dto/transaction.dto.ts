@@ -1,19 +1,26 @@
-import { IsInt, IsNotEmpty, IsNumber, IsUUID } from "class-validator";
+import { InputType, Field } from "@nestjs/graphql";
+import { IsNotEmpty, IsUUID, IsInt, IsPositive } from "class-validator";
 
+@InputType()
 export class CreateTransactionDto {
+  @Field()
   @IsUUID()
   @IsNotEmpty()
   accountExternalIdDebit: string;
 
+  @Field()
   @IsUUID()
   @IsNotEmpty()
   accountExternalIdCredit: string;
 
+  @Field()
   @IsInt()
+  @IsPositive()
   @IsNotEmpty()
   transferTypeId: number;
 
-  @IsNumber()
+  @Field()
+  @IsPositive()
   @IsNotEmpty()
   value: number;
 }

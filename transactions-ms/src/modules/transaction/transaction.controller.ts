@@ -1,46 +1,19 @@
-import { Body, Controller, Get, Logger, Param, Post } from "@nestjs/common";
-import { TransactionService } from "./transaction.service";
-import { CreateTransactionDto } from "./dto/create-transaction.dto";
-import { KafkaTopics } from "./enum/kafka.enum";
+import { Controller } from "@nestjs/common";
 import { MessagePattern, Payload } from "@nestjs/microservices";
+import { KafkaTopics } from "./enum/kafka.enum";
+import { TransactionService } from "./transaction.service";
 
-@Controller("transactions")
+@Controller()
 export class TransactionController {
-  private readonly logger = new Logger(TransactionController.name);
-
   constructor(private readonly transactionService: TransactionService) {}
 
-  @Post()
-  createTransaction(@Body() input: CreateTransactionDto) {
-    return this.transactionService.createTransaction(input);
-  }
-
-  @Get(":id")
-  getTransaction(@Param("id") id: string) {
-    return this.transactionService.getTransactionById(id);
-  }
-
   @MessagePattern(KafkaTopics.TRANSACTION_APPROVED)
-  transactionAproved(@Payload() message: { transaction: any }) {
-    this.logger.log("Message received from Kafka", { message });
-    try {
-      this.transactionService.processApprovedTransaction(
-        message.transaction.id
-      );
-    } catch (error) {
-      this.logger.error("Error processing approved transaction", error);
-    }
+  transactionAproved(@Payload() message: { transactionId: string }) {
+    this.transactionService.processApprovedTransaction(message.transactionId);
   }
 
   @MessagePattern(KafkaTopics.TRANSACTION_REJECTED)
-  transactionRejected(@Payload() message: { transaction: any }) {
-    this.logger.log("Message received from Kafka", { message });
-    try {
-      this.transactionService.processRejectedTransaction(
-        message.transaction.id
-      );
-    } catch (error) {
-      this.logger.error("Error processing rejected transaction", error);
-    }
+  transactionRejected(@Payload() message: { transactionId: string }) {
+    this.transactionService.processRejectedTransaction(message.transactionId);
   }
 }
