@@ -5,11 +5,14 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { PrismaService } from "src/prisma.service";
-import { Prisma, Status } from "@prisma/client";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { ClientKafka } from "@nestjs/microservices";
+import { Prisma, Status } from "@prisma/client";
+import { Cache } from "cache-manager";
 import { KafkaTopics } from "./enum/kafka.enum";
 import { mapTransaction } from "./mapper/transaction.mapper";
+import { PrismaService } from "../../prisma.service";
+import { Transaction } from "./types/transaction.type";
 
 @Injectable()
 export class TransactionService {
@@ -17,7 +20,9 @@ export class TransactionService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject("KAFKA_TRANSACTION_SERVICE") private readonly kafkaPort: ClientKafka
+    @Inject("KAFKA_TRANSACTION_SERVICE")
+    private readonly kafkaPort: ClientKafka,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache
   ) {}
 
   private async retry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
@@ -67,16 +72,31 @@ export class TransactionService {
   async getTransactionById(transactionId: string) {
     this.logger.debug(`Getting transaction with id ${transactionId}`);
     return this.retry(async () => {
-      const transaction = await this.prisma.transaction.findFirst({
+      const cachedTransaction = await this.cacheManager.get<
+        Transaction | undefined
+      >(transactionId);
+
+      if (cachedTransaction) {
+        this.logger.debug(`Transaction ${transactionId} found in cache`);
+        return {
+          ...cachedTransaction,
+          createdAt: new Date(cachedTransaction.createdAt),
+        };
+      }
+
+      const dbTransaction = await this.prisma.transaction.findFirst({
         where: { id: transactionId },
       });
-      if (!transaction) {
+      if (!dbTransaction) {
         this.logger.debug(`Transaction ${transactionId} not found`);
         throw new NotFoundException("Transaction not found");
       }
-      this.logger.debug(`Transaction ${transactionId} found`);
+      this.logger.debug(`Transaction ${transactionId} found in database`);
 
-      return mapTransaction(transaction);
+      const transaction = mapTransaction(dbTransaction);
+      await this.cacheManager.set(transactionId, transaction);
+      this.logger.debug(`Transaction ${transactionId} cached`);
+      return transaction;
     });
   }
 
