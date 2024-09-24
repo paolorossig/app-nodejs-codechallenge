@@ -34,6 +34,6 @@ type Mutation {
 input CreateTransactionDto {
   accountExternalIdDebit: String!
   accountExternalIdCredit: String!
-  transferTypeId: Float!
+  tranferTypeId: Float!
   value: Float!
 }

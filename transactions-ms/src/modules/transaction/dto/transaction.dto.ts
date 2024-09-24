@@ -17,7 +17,7 @@ export class CreateTransactionDto {
   @IsInt()
   @IsPositive()
   @IsNotEmpty()
-  transferTypeId: number;
+  tranferTypeId: number;
 
   @Field()
   @IsPositive()

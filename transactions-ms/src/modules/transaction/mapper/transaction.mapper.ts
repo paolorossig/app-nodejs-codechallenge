@@ -1,7 +1,7 @@
 import { Transaction as TransactionData } from "@prisma/client";
 import { Transaction } from "../types/transaction.type";
 
-// This variable maps transferTypeId to their corresponding transaction type names.
+// This variable maps tranferTypeId to their corresponding transaction type names.
 const transactionTypeName = {
   1: "DEBIT",
   2: "CREDIT",
@@ -13,7 +13,7 @@ export const mapTransaction = (
   return {
     transactionExternalId: transactionData.id,
     transactionType: {
-      name: transactionTypeName[transactionData.transferTypeId] ?? "UNKNOWN",
+      name: transactionTypeName[transactionData.tranferTypeId] ?? "UNKNOWN",
     },
     transactionStatus: {
       name: transactionData.status,

@@ -11,7 +11,7 @@ model Transaction {
   id                      String   @id @default(cuid())
   accountExternalIdDebit  String
   accountExternalIdCredit String
-  transferTypeId          Int
+  tranferTypeId           Int
   value                   Int
   status                  Status   @default(pending)
   createdAt               DateTime @default(now())
