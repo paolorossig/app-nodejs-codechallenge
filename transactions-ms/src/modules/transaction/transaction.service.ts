@@ -25,6 +25,10 @@ export class TransactionService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache
   ) {}
 
+  /**
+   * The `retry` function retries an asynchronous operation with exponential backoff
+   * and specific error handling, avoiding retrying on unnecessary situations.
+   */
   private async retry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
@@ -44,7 +48,7 @@ export class TransactionService {
         // Exponential wait time
         const waitTime = 100 * Math.pow(2, attempt);
         this.logger.warn(
-          `Attempt ${attempt + 1} failed, retrying in ...${waitTime}ms`
+          `Attempt ${attempt + 1} failed, retrying in ${waitTime} ms`
         );
         await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
@@ -60,15 +64,20 @@ export class TransactionService {
         data: createTransactionInput,
       });
 
+      this.logger.debug(`Transaction ${createdTransaction.id} created`);
       const transaction = mapTransaction(createdTransaction);
 
       this.kafkaPort.emit(KafkaTopics.TRANSACTION_CREATED, { transaction });
-      this.logger.debug("Message sent to kafka successfully");
+      this.logger.debug("Message sent to kafka successfully", { transaction });
 
       return transaction;
     });
   }
 
+  /**
+   * This function retrieves a transaction by its ID, first checking a cache and then querying a
+   * database if necessary. If the transaction is found in the database, it is cached for future requests.
+   */
   async getTransactionById(transactionId: string) {
     this.logger.debug(`Getting transaction with id ${transactionId}`);
     return this.retry(async () => {

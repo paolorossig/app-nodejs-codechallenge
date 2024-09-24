@@ -32,6 +32,7 @@ export class AntiFraudService {
         `Error validating the transaction ${transactionExternalId}`,
         error
       );
+      throw error;
     }
   }
 }
